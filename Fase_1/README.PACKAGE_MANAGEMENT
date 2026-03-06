@@ -1,0 +1,87 @@
+TÍTULO: Gestión de paquetes en jhalfs
+POR: Pierre Labastie (trabajo en progreso)
+
+1. INTRODUCCIÓN:
+
+      Hay varias sugerencias que discuten la gestión de paquetes para LFS, pero
+   nada bajo jhalfs. Solía haber un parche para PACO que ahora no puedo
+   encontrar. Por lo que había una necesidad de una herramienta de este tipo, y una infraestructura,
+   que permite usar un gestor de paquetes dentro de jhalfs, ha sido desarrollada.
+   Espero que sea lo suficientemente flexible como para soportar varios gestores de paquetes, al menos
+   entre los que usan la instalación DESTDIR y/o LD_PRELOAD durante la instalación.
+   Ha sido probado con dpkg de Debian, pacman de Arch Linux,
+   y porg. Se proporcionan archivos de configuración de muestra para esos tres paquetes.
+   Lamento decir que (casi) no tengo experiencia con rpm, por lo que no puedo
+   decir si encajaría.
+
+2. VISIÓN GENERAL DEL SISTEMA:
+
+      Por ahora, la gestión de paquetes solo está disponible para LFS. El `estilo porg'
+   (ver más abajo) de gestión de paquetes ha sido portado a BLFS, pero no el estilo
+   distro (el diseño del libro lo hace bastante difícil).
+
+      Esta herramienta viene en dos sabores:
+   - para los gestores de paquetes de las distros (por ejemplo, dpkg o pacman), básicamente realiza
+     una "instalación DESTDIR" para todas las páginas en los capítulos 8, 9 y 10 del libro. El
+     nombre del directorio DESTDIR es el mismo que el del script
+     ejecutado. La ruta a este directorio está disponible para los scripts a través
+     de la variable PKG_DEST. Los detalles de la parte DESTDIR se dan a continuación.
+     Después de que el paquete se instala en $PKG_DEST, se llama a una función "packInstall",
+     que se supone que crea un paquete binario (por ejemplo, hacer un archivo .deb),
+     almacenarlo en un repositorio e instalarlo en el sistema.
+   - para el gestor de paquetes de estilo porg, las instrucciones de instalación están envueltas
+     entre pares de comillas simples ('). Esto permite pasar esas instrucciones
+     a una función ("wrapInstall"), que puede a su vez llamar a porg o a otro
+     (por ejemplo, fakeroot, no probado) contenedor de instrucciones. Ten en cuenta que si las
+     instrucciones contienen caracteres de comillas simples, se cambian a '\'',
+     lo que las pasa literalmente. Al final de la instalación, se llama a una función
+     "packInstall", con un objetivo ligeramente diferente en comparación con el
+     de DESTDIR: se usa para hacer un tarball de los archivos instalados (por ejemplo,
+     usando "porgball") y almacenarlos en algún repositorio. Pero no hay
+     necesidad de instalarlos en el sistema, ya que esto ya se ha hecho.
+
+      Ten en cuenta que con funciones "packInstall" y "wrapInstall" cuidadosamente diseñadas,
+   se podría usar una combinación de los dos métodos, por ejemplo, para
+   instalaciones DESTDIR usando fakeroot. Esto es un trabajo en progreso y no está completamente
+   implementado aún (bueno... Más bien es una lista de deseos en realidad).
+
+3. DETALLES:
+
+      La hoja de estilos XSL utilizada para generar los scripts, añade automáticamente
+   las instrucciones de instalación DESTDIR cuando se selecciona "gestión de paquetes".
+   También todas las rutas que empiezan con " /" o ">/" (rutas absolutas) son precedidas
+   con $PKG_DEST. Esto tiene el defecto de que podrías querer mover
+   archivos a directorios inexistentes. No hay una manera sencilla de crear
+   automáticamente esos directorios, porque a veces tienes que usar la ruta completa
+   (instrucciones de la forma `cp archivo dir') y a veces solo el nombre del directorio
+   (instrucciones de la forma `cp archivo1 archivo2'). Así que la hoja de estilos XSL
+   crea un subconjunto razonable de la jerarquía FHS en el directorio de
+   destino. Los directorios vacíos luego se eliminan antes de empaquetar el
+   paquete binario.
+
+      Para poder usar el gestor de paquetes, tiene que ser instalado al final del
+   capítulo 7 (instalación temporal) y del capítulo 8 (instalación final).
+   Además, los archivos y directorios administrativos tienen que ser creados
+   durante las etapas de `Creación de Directorios' y `Creación de Archivos Esenciales'.
+   Para todo esto, el usuario tiene que suministrar un archivo en formato DocBook XML, con
+   las instrucciones necesarias y suficiente información para descargar el tarball.
+   Este archivo debería residir en el directorio `pkgmngt' y llamarse
+   `packageManager.xml'. Se proporciona una plantilla llamada `packageManager.xml.template'
+   en el subdirectorio `pkgmngt'. También hay tres archivos XML para
+   dpkg, pacman, y porg, respectivamente `packageManager.xml.dpkg',
+   `packageManager.xml.pacman', y `packageManager.xml.porg', que puedes
+   copiar a `packageManager.xml' y modificar para que se adapte a tus necesidades.
+   No se actualizan a menudo, así que las versiones usadas pueden ser bastante antiguas.
+
+      Lo último a hacer es indicar cómo usar el gestor de paquetes. El usuario
+   tiene que proporcionar dos funciones, "wrapInstall" y "packInstall", como se describe
+   anteriormente. Por favor, ten en cuenta que no se ha hecho nada para gestionar los archivos de
+   configuración, que son usualmente tratados de forma especial por los gestores de paquetes: dependiendo del
+   diseño del libro, a veces es posible crear esos archivos después,
+   y a veces no, lo que significa que tienes que revisarlos después de cada
+   actualización. Ambas funciones deberían estar definidas en un archivo llamado `packInstall.sh',
+   que resida en el directorio `pkgmngt'. Se proporciona una plantilla (en realidad una copia
+   del archivo para dpkg), así como tres scripts de ejemplo para dpkg, pacman,
+   y porg. Nota sobre Pacman: debido a la forma en que pacman verifica el espacio disponible en
+   disco, el directorio raíz en chroot debe ser un punto de montaje, de otra forma la
+   instalación de paquetes falla.

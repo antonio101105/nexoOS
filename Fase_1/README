@@ -1,0 +1,448 @@
+1. INTRODUCCIÓN::
+
+      Los scripts en este directorio implementan una automatización de la construcción
+   de un sistema GNU/Linux, tal y como se describe en la serie de libros Linux From Scratch.
+   El nombre del proyecto es jhalfs: en ese nombre, "alfs" significa
+   "automated linux from scratch" (linux from scratch automatizado), y las iniciales "jh" se han mantenido desde
+   el código original "jhalfs-0.2" desarrollado por Jeremy Huntwork.
+
+      La lista de libros soportados se puede encontrar en
+   http://wiki.linuxfromscratch.org/alfs/wiki/SupportedBooks (puede estar desactualizada,
+   los libros en desarrollo actual y la última versión siempre están soportados).
+
+      La documentación está dividida entre varios archivos README.*. Aquí hay una lista
+   de lo que hay en cada uno:
+      - README (este archivo): instrucciones para usar el libro LFS. Esto debería ser
+        suficiente si solo quieres construir un sistema base según el libro LFS.
+        También es una lectura requerida para todos los demás proyectos.
+      - README.BLFS: instrucciones para instalar una infraestructura de construcción automatizada
+        para el libro BLFS. Hay dos maneras de hacerlo: (i) instalar las
+        herramientas al final de una construcción LFS, o
+        (ii) instalar las herramientas en un sistema ya en funcionamiento. Ambos métodos están
+        descritos en ese archivo.
+      - README.CUSTOM: instrucciones para ejecutar comandos personalizados ya sea durante la
+        construcción de LFS, o al final de una construcción LFS. Ten en cuenta que no encontrarás
+        instrucciones sobre cómo escribir esos comandos, pero algunos ejemplos están
+        disponibles.
+      - README.PACKAGE_MANAGEMENT: instrucciones para usar la gestión de paquetes durante
+        la construcción (Nota: el único gestor de paquetes que se prueba regularmente es
+        porg)
+
+      Otras fuentes de información son la ayuda contextual en la interfaz del menú,
+   y los propios libros LFS (¡ambas lecturas obligatorias por supuesto!).
+
+      Y para los impacientes: los procedimientos paso a paso se dan en CHEATSHEET.
+   Esos procedimientos llevan al usuario hasta una construcción completa de LFS y la instalación de
+   herramientas para construir paquetes BLFS. Pero debería ser obvio eliminar
+   pasos superfluos para simplemente construir LFS.
+   
+
+2. PRERREQUISITOS::
+
+      Se aconseja encarecidamente que primero construyas manualmente un sistema completo
+   antes de intentar automatizar la construcción.
+
+      Además de un buen conocimiento de UNIX (linux), la capacidad de leer,
+   entender y modificar scripts de shell puede ser requerida en algún momento.
+
+      Dado que las fuentes XML del libro son utilizadas por esta herramienta, y estas se mantienen
+   en un repositorio git, un conocimiento básico de git puede ayudar.
+
+      Por supuesto, los "Requisitos del Sistema Anfitrión" ("Host System Requirements") deben cumplirse. Algunos
+   paquetes suplementarios son necesarios para usar jhalfs. Están detallados
+   al final de la página:
+   https://www.linuxfromscratch.org/alfs/download.html. En resumen, necesitas
+   wget, sudo, libxml2, libxslt, docbook-4.5-xml, y docbook-xsl-nons.
+
+3. INSTALACIÓN::
+
+      No se requiere instalación. Puedes querer mover los archivos en este
+   directorio a una ubicación conveniente, y luego seguir las instrucciones a continuación.
+
+4. CONFIGURACIÓN::
+
+   4.1. CONFIGURACIÓN DE LAS HERRAMIENTAS:
+         No hay configuración de las herramientas en sí. Los diversos
+      parámetros para la construcción se establecen a través de una interfaz controlada por menús. Consulta
+      la sección EJECUCIÓN (RUNNING) a continuación para más detalles.
+
+   4.2. TAREAS PRELIMINARES:
+         Esta herramienta no tiene soporte en absoluto para crear una partición y un punto
+      de montaje para el sistema construido. Deberías seguir el libro hasta la sección
+      "Montando la nueva partición" ("Mounting the new partition"). Ten en cuenta que el nombre por defecto para el
+      punto de montaje de la partición es "/mnt/build_dir", en lugar de /mnt/lfs.
+      Puedes cambiar ese valor por defecto a cualquier cosa que quieras en el menú, así que
+      puedes nombrarlo /mnt/lfs si lo prefieres. Usaremos el nombre /mnt/build_dir
+      en lo sucesivo.
+
+         Para descargar paquetes, puedes usar la herramienta o descargarlos
+      tú mismo. Incluso si usas la herramienta, se recomienda establecer un repositorio
+      de fuentes donde almacenes los paquetes ya descargados. La herramienta
+      buscará automáticamente un paquete en este repositorio antes de descargarlo
+      si no se encuentra allí. Este repositorio no puede ser el mismo que
+      /mnt/build_dir/sources. Como ejemplo, usaremos /usr/src. Deberías
+      organizar que el usuario que ejecuta la herramienta tenga acceso de escritura a este
+      directorio.
+
+         Si quieres construir el núcleo (kernel) como parte de la construcción automatizada,
+      se debe proporcionar un archivo de configuración. Para hacerlo, se
+      recomienda descargar el tarball del kernel, desempaquetarlo, ejecutar
+      <make menuconfig> (o cualquier otro *config), configurar el kernel según
+      el libro, y guardar el archivo .config resultante en una ubicación donde pueda
+      ser recuperado más tarde. Se sugiere ponerlo en el repositorio de
+      fuentes, con un nombre versionado, por ejemplo
+      /usr/src/config-<arch>-<versión del kernel>-<detalles de configuración>.
+
+         Otro archivo que puedes proporcionar es el archivo fstab. Al igual que para la configuración
+      del kernel, este archivo tiene que ser preparado antes de ejecutar el menú.
+      Puedes copiar-pegar el archivo de la página "Creando el archivo /etc/fstab",
+      luego editarlo para adaptarlo al diseño del futuro sistema LFS, y luego guardar el
+      archivo. Una ubicación y nombre convenientes es /usr/src/fstablfs.
+
+         A un nivel más avanzado, puedes querer suministrar comandos personalizados
+      para ser ejecutados al final de la construcción de LFS. Los scripts que contienen esos comandos
+      se encuentran en el directorio ./custom/config. Se dan ejemplos en
+      ./custom/examples. Se proporciona una plantilla como ./custom/template. Consulta
+      README.CUSTOM para más detalles.
+
+5. EJECUCIÓN::
+
+   ¡¡IMPORTANTE!!::
+         Debes haber iniciado sesión como un usuario normal con privilegios sudo para ejecutar
+      el Makefile. Además, se supone que tienes suficientes privilegios
+      para convertirte en cualquier usuario. Si no te importan los problemas de seguridad,
+      la entrada para el usuario que ejecuta la herramienta en /etc/sudoers podría ser
+      <user> ALL=(ALL) NOPASSWD:ALL
+
+      El comando <make> lanzará un programa de configuración basado en menús,
+   similar a la herramienta de configuración del kernel "menuconfig".
+
+      La ayuda sobre la función de los parámetros está disponible en la ayuda en línea (escribe el
+   carácter `?' después de resaltar el parámetro). Por favor, usa la ayuda:
+   puede contener información adicional no duplicada en este archivo.
+
+   MENÚ "BOOK Settings" (Ajustes del Libro)
+
+      Choose BOOK (Elegir LIBRO): Tienes dos opciones: "Linux from scratch" o
+      "Beyond Linux From Scratch (see help)"
+         La parte de BLFS se describe en README.BLFS
+
+      Init system (Sistema de inicio): Tienes dos opciones: "LFS SysV" o "LFS systemd" (o
+      lo mismo con BLFS si lo has elegido arriba)
+         Permite elegir entre las dos versiones de los libros.
+
+      XML source of the Book (Fuente XML del Libro): Dos opciones: "retrieved from git repository" (recuperado del repositorio git) o
+      "Local Copy" (Copia Local)
+         La primera opción es más flexible, ya que permitirá elegir cualquier
+      punto en el historial de git. Pero la segunda permite hacer cambios locales
+      al código fuente.
+
+      Which point in git history? (¿Qué punto en el historial de git?) (si has elegido recuperar las fuentes
+      del libro del repositorio git)
+         Puedes usar cualquier forma de denotar un commit conocido por el programa "git".
+      Los más populares son "trunk" (para la versión de desarrollo) o la
+      cadena de versión de una versión estable (como "12.1").
+
+      Location of local copy (mandatory) (Ubicación de la copia local (obligatorio)) (si has elegido la copia
+      local)
+         Esta es la ruta absoluta a la copia local de las fuentes del libro.
+
+      Multilib: Cuatro opciones: Normal LFS, Multilib with i686 libraries (Multilib con bibliotecas i686),
+      multilib with x32 libraries (multilib con bibliotecas x32), multilib with all libraries (multilib con todas las bibliotecas).
+         Se recomienda usar "Normal LFS" a menos que sepas lo que
+      estás haciendo
+
+      Build method (Método de construcción): dos opciones: chroot (como en el libro), boot
+         Actualmente, el método "boot" no está implementado, así que mantén el valor por defecto.
+
+      Add blfs-tools support (Añadir soporte de blfs-tools) (ver README.BLFS)
+         Esto instalará las herramientas blfs en el sistema recién construido. No
+      es lo mismo que elegir el libro BLFS en el menú, lo cual
+      instalará las herramientas blfs en el sistema que se está ejecutando actualmente.
+
+      Add custom tools support (Añadir soporte de herramientas personalizadas) (ver README.CUSTOM)
+
+   MENÚ "General Settings" (Ajustes Generales)
+
+      Temporary user for chapters 4, 5, and 6 (should not exist) (Usuario temporal para capítulos 4, 5 y 6 (no debería existir)):
+         el nombre del usuario que ejecuta los comandos en esos capítulos. En el
+      libro, se llama lfs, y este es el valor por defecto. Puedes cambiarlo
+      a cualquier usuario que no exista.
+
+      Group of user for chapters 4, 5, and 6 (should not exist) (Grupo de usuario para capítulos 4, 5 y 6 (no debería existir)):
+         esto es lfs en el libro, pero puedes renombrarlo a cualquier nombre de grupo
+      que no exista.
+
+      Build Directory (Directorio de Construcción): el nombre de la raíz del sistema LFS
+         Esto es el equivalente de la variable LFS en el libro. Ajústalo
+      a "/mnt/lfs" si has seguido el libro para crear la
+      partición y el punto de montaje de LFS.
+
+      Retrieve source files (Recuperar archivos fuente): Di y (sí) para que jhalfs descargue los paquetes
+         Si dices no, debes descargar los paquetes tú mismo y ponerlos
+      en el directorio /mnt/build_dir/sources. Sigue las instrucciones
+      del capítulo 3 del libro.
+         Si dices yes, se te harán varias otras preguntas:
+         - Package Archive Directory (Directorio del Archivo de Paquetes): Repositorio de paquetes descargados
+            Este directorio, que está en el anfitrión y debería tener permisos de escritura
+         para el usuario que ejecuta la herramienta, es para almacenar los paquetes descargados.
+            Si mantienes el valor por defecto "$SRC_ARCHIVE", puedes configurar esta variable
+         con la ruta absoluta del repositorio y exportarla. O si la
+         variable no está establecida, jhalfs descarga las fuentes directamente a
+         /mnt/build_dir/sources.
+            En lugar de usar la variable de entorno SRC_ARCHIVE, también puedes introducir la
+         ruta del directorio del repositorio en este campo.
+         - Retry on 'connection refused' failure (Reintentar en fallo de 'conexión rechazada'): autoexplicativo
+         - Number of retry attempts on download failures (Número de intentos de reintento en fallos de descarga): autoexplicativo
+         - Download timeout (in seconds) (Tiempo de espera de descarga (en segundos)): autoexplicativo
+
+      Run the makefile (Ejecutar el makefile): iniciar la construcción inmediatamente después de ejecutar la herramienta
+         Este no es el método preferido: se recomienda
+      ejecutar "make -C /mnt/build_dir/jhalfs" después de que la herramienta haya terminado
+      de configurar la construcción. Pero esto puede ser útil si estás seguro de que todo
+      está bien, y quieres dejar la herramienta y la construcción ejecutándose sin
+      supervisión.
+
+      Rebuild files (Reconstruir archivos): limpiar el directorio /mnt/build_dir
+         Di n si quieres volver a ejecutar la herramienta (para actualizar scripts generados
+      por ejemplo) sin eliminar lo que ya se ha hecho. De lo contrario,
+      di y (sí). Ten en cuenta que hay algunas protecciones contra la eliminación de un directorio
+      que contenga cosas útiles, pero comprueba dos veces que el directorio
+      /mnt/build_dir es realmente lo que quieres borrar.
+
+   MENÚ "Build Settings" (Ajustes de Construcción)
+
+      MENÚ Parallelism settings (Ajustes de paralelismo)
+       - Use all cores (Usar todos los núcleos):
+            Si dices y, MAKEFLAGS se establecerá en "-j$(nproc)" al
+         principio de cada script. Se supone que otras variables de entorno pasan
+         del entorno, como se hace en los nuevos libros. Ten en cuenta que para libros antiguos,
+         esto significa que los scripts que usan make o ninja se ejecutarán con todos
+         los núcleos, pero no cuando esto necesite establecer variables especiales como
+         TESTSUITEFLAGS. Aún puedes definir el número de núcleos usados
+         en el siguiente campo.
+       - set of cpus to use, or 'all' for all cpus (conjunto de cpus a usar, o 'all' para todas) (solo si se usan todos los núcleos):
+            Puedes definir aquí los núcleos que quieres usar. Consulta la ayuda para
+         detalles. Esta es la forma preferida de reducir el número de núcleos
+         en lugar de usar un número de hilos estático.
+       - Number of parallel `make' jobs (Número de trabajos paralelos de `make') (solo si no se usan todos los núcleos):
+            Cada ocurrencia de $(nproc) en los nuevos libros será reemplazada con
+         el número introducido aquí. También MAKEFLAGS se establecerá en "-jN" (donde
+         N es el número introducido) al principio de cada script. Además
+         NINJAJOBS se establecerá en N en el entorno. Esto permite ejecutar todos
+         los libros con N hilos, excepto las partes que necesitan que se establezcan
+         otras variables de entorno
+       - Build Binutils pass1 without parallelism (Real SBU) (Construir pasada 1 de Binutils sin paralelismo (SBU real))
+            El SBU estándar se define como el tiempo para ejecutar la construcción
+         binutils-pass1 con solo un hilo. Decir y (sí) aquí permite obtener un valor para
+         ello. Si dices n, el valor no es significativo para las mediciones de SBU.
+
+      Run testsuites (Ejecutar conjuntos de pruebas): di y para ejecutar las suites de pruebas
+         Tendrás la opción entre ejecutar todos los conjuntos de pruebas, o solo
+      aquellos considerados críticos (binutils, gmp, mpfr, mpc, y gcc).
+
+      Package management (Gestión de paquetes): ver README.PACKAGE_MANAGEMENT
+
+      Create a log of installed files for each package (Crear un registro de archivos instalados para cada paquete): autoexplicativo
+
+      Strip Installed Binaries/Libraries (Despojar a Binarios/Bibliotecas instalados de sus símbolos): usar las instrucciones del libro para
+      el despojo (stripping)
+
+      DO NOT use/display progress_bar (NO usar/mostrar la barra_de_progreso) (autoexplicativo)
+
+   MENÚ System configuration (Configuración del sistema)
+
+      Use a custom fstab file (Usar un archivo fstab personalizado):
+         Si dices y, tendrás que proporcionar un archivo que contenga el fstab
+      para el sistema LFS. Ver arriba "tareas preliminares".
+
+      Build the kernel (Construir el kernel):
+         Si dices y, se te pedirá un archivo que contenga la configuración
+      del kernel. Ver arriba "tareas preliminares".
+
+      Install non-wide-character ncurses (Instalar ncurses de caracteres no anchos) (raramente usado hoy en día):
+         Si dices y, el sistema usará las instrucciones en la nota de la
+      página de ncurses para instalar esas bibliotecas.
+
+      TimeZone (Zona Horaria): establecer con el resultado de "tzselect"
+
+      Language (Idioma): establecer con el resultado de las instrucciones en la página "The Bash Shell
+      Startup Files" (Los Archivos de Inicio de la Shell Bash).
+
+      Install the full set of locales (Instalar el conjunto completo de locales): instala todas las configuraciones regionales (locales) conocidas por
+      glibc.
+
+      Groff page size (Tamaño de página de Groff): a elegir entre "A4" y "Letter" (Carta).
+
+      Hostname (Nombre de host): autoexplicativo
+
+      Network configuration (Configuración de red): varios campos para configurar la red. Mira
+      el capítulo 9 en busca de contexto.
+
+      Console configuration (Configuración de la consola): varios campos para configurar la consola, como se describe
+      en el capítulo 9.
+
+   MENÚ Advanced features (Funciones avanzadas):
+
+      Optimization (Optimización): Los ajustes de optimización se hacen editando archivos en el
+      directorio "optimize". El menú solo permite elegir entre aplicar
+      optimizaciones solo al capítulo final o a todo el libro. Di n para
+      una construcción normal.
+
+      Create SBU and disk usage report (Crear informe de SBU y uso de disco): autoexplicativo
+
+      Save temporary system work (Guardar trabajo del sistema temporal): autoexplicativo (consultar ayuda)
+
+      Run comparison analysis on final stage (Ejecutar análisis de comparación en la etapa final): construye el sistema varias veces
+      usando la precedente, para probar si es capaz de reconstruirse
+      de manera idéntica. No utilizar de forma normal...
+
+      Internal Settings (WARNING: for jhalfs developers only) (Ajustes Internos (ADVERTENCIA: solo para desarrolladores de jhalfs)): lo dice todo
+
+     Una vez que hayas establecido los parámetros y guardado la configuración, se lanza el
+  script. Su objetivo es extraer instrucciones del libro seleccionado
+  para generar scripts, y generar un Makefile, que permite ejecutar
+  los scripts en el orden correcto. El script verifica primero que el anfitrión
+  puede ejecutarse a sí mismo y construir el sistema xLFS, luego valida la configuración
+  y enumera los parámetros. En este punto, puedes elegir salir o
+  continuar con los parámetros enumerados. El script entonces procederá a
+  generar el Makefile y los scripts de construcción, opcionalmente descargará
+  paquetes, y finalmente verificará los prerrequisitos del anfitrión. Si has
+  seleccionado "Run the makefile" (Ejecutar el makefile), el comando <make> se lanza en el
+  directorio adecuado, y comienza la construcción. Si no, tendrás que ejecutar
+  "make" manualmente, por ejemplo: "make -C /mnt/build_dir/jhalfs", si
+  has usado los parámetros por defecto (ver el diseño bajo $BUILDDIR en las
+  Preguntas Frecuentes abajo).
+
+  NOTA::
+      Si ejecutas el script jhalfs directamente la única función que puedes seleccionar
+      es mostrar el número de versión ejecutando <./jhalfs -v>
+
+6. DISEÑO::
+
+        /BLFS/* (ver README.BLFS)
+
+        /LFS/master.sh
+            /lfs.xsl
+
+        /common/chroot.xsl
+               /common_functions
+               /create-sbu_du-report.sh
+               /hostreqs.xsl
+               /kernfs.xsl
+               /makefile_functions
+               /packages.xsl
+               /progress_bar.sh
+               /urls.xsl
+               /libs/func_*
+
+        /custom/examples/*
+               /config/* (necesita ser creado después de clonar ya que es un
+                          directorio vacío inicialmente)
+               /template
+
+        /extras/do_copy_files
+               /do_ica_prep
+               /do_ica_work
+
+        /menu/*
+
+        /optimize/opt_config
+                 /opt_override
+                 /optimize_functions
+                 /opt_config.d/noOpt
+                              /noSymbols
+                              /O2pipe
+                              /O3pipe
+                              /O3pipe_march
+                              /defOpt_fPIC
+
+        /pkgmngt/packageManager.xml.dpkg
+                /packageManager.xml.pacman
+                /packageManager.xml.porg
+                /packageManager.xml.template
+                /packInstall.sh.dpkg
+                /packInstall.sh.pacman
+                /packInstall.sh.porg
+                /packInstall.sh.template
+
+        CHEATSHEET
+        CHEATSHEET.BLFS
+        FUNCTION_LIST
+        LICENSE
+        README
+        README.BLFS
+        README.CUSTOM
+        README.PACKAGE_MANAGEMENT
+        TODO
+
+        Config.in
+        jhalfs
+        Makefile
+
+7. PREGUNTAS FRECUENTES::
+    P. "No funciona"
+    R. Hay varias razones por las que esto puede ser así. Una posibilidad es la
+       siguiente: jhalfs fue diseñado para trabajar contra las versiones de desarrollo
+       de la serie de libros LFS. En consecuencia los cambios en un libro a veces
+       rompen versiones antiguas de jhalfs. Antes de empezar a arrancarte el pelo,
+       descarga la última versión de jhalfs para ver si eso resuelve tu
+       problema. Ten en cuenta que puede ser al revés. Si quieres construir
+       una versión antigua del libro, puedes tener que degradar tu versión de
+       jhalfs.
+
+    P. "¿Cómo especifico la ubicación de la construcción?"
+    R. El documento LFS original funcionaba sobre la ubicación bien conocida
+       /mnt/lfs. Este script automatiza la construcción de todas las series de libros
+       LFS y usa una ubicación genérica $BUILDDIR con un valor por defecto de
+       /mnt/build_dir. Puedes cambiar este valor para ajustarlo a tus necesidades.
+
+       El diseño bajo $BUILDDIR es como sigue.
+       $BUILDDIR/
+            jhalfs      (Makefile, scripts de cmd, registros, etc..)
+            sources     (donde residen los paquetes)
+            tools       (el compilador cruzado temporal)
+                ...
+            Estructura de dir FHS
+                ...
+            blfs_root   (archivos a usar por blfs-tool si se eligió instalarlo)
+
+    P. "¿Cuál es la función de la variable SRC_ARCHIVE?"
+    R. Cuando jhalfs se ejecuta y se seleccionó la descarga de paquetes, crea una copia
+       local de los paquetes necesarios en $BUILDDIR/sources descargando los
+       archivos. Si la variable SRC_ARCHIVE está definida, el software buscará
+       primero en esta ubicación el archivo y, si lo encuentra, lo copiará a
+       $BUILDDIR/sources.
+       Si los archivos no se encuentran en SRC_ARCHIVE _y_ tú tienes permisos de
+       escritura para el directorio, todos los archivos descargados se depositarán ahí.
+
+    P. "¿Cómo ajusto la ubicación de SRC_ARCHIVE?"
+    R. La mejor forma de establecer el valor de SRC_ARCHIVE es
+
+       export SRC_ARCHIVE=/donde/guardes/los/paquetes/descargados
+
+       o puedes establecer la ruta completa en la entrada correcta del menú.
+
+    P. "¿Por qué tener 2 copias de los archivos?"
+    R. Los archivos de los paquetes deben estar visibles durante la fase chroot y este es un
+       método simple y fiable de hacerlo. Este método también maneja el método
+       de construcción boot donde la construcción final se puede llevar a cabo en una
+       máquina separada.
+
+    P. "¿Cómo podría detener la construcción en un punto predefinido y elegido?"
+    R. Lanza el Makefile manualmente pasándole el último objetivo numerado que deba construirse
+       como punto de interrupción. Por ejemplo:
+
+          make BREAKPOINT=84-bash
+
+       La construcción también se puede detener al final de una fase de construcción de alto nivel
+       llamando directamente al objetivo mk_* apropiado. Por ejemplo:
+
+          make mk_LUSER
+
+       Consulta el Makefile para saber los nombres de los objetivos correctos para la construcción de ese libro.
+
+Autores:
+  George Boudreau
+  Manuel Canales Esparcia
+  Pierre Labastie

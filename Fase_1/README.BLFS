@@ -1,0 +1,362 @@
+1. INTRODUCCIÓN::
+
+     Automatizar la construcción de paquetes a partir de las instrucciones del libro BLFS es una enorme
+  tarea. Algunos de los problemas son: el libro BLFS no es lineal; algunas páginas de paquetes
+  usan un diseño personalizado; hay dependencias circulares; varios paquetes pueden ser
+  instalados en un prefijo no predeterminado; los comandos de construcción pueden cambiar
+  basándose en las dependencias que se usarán, etc.
+
+     Dicho esto, el objetivo de la herramienta blfs-tool es ayudarte a resolver las dependencias
+  de los paquetes, crear scripts de construcción y un Makefile. No todos los scripts de
+  construcción autogenerados y el Makefile funcionarán "tal cual", así, como regla general,
+  necesitarás revisar y editar los scripts mientras lees el libro.
+
+     Las herramientas blfs permiten también actualizar paquetes del libro LFS. Los paquetes
+  LFS que pueden ser actualizados aparecen en la interfaz del menú. Al seleccionarse,
+  su script se genera de la misma forma que para los paquetes BLFS.
+  (POR HACER: actualmente, cuando un paquete LFS necesita un parche, tendrás que
+  descargarlo manualmente a tu directorio $SRC_ARCHIVE (usualmente /sources)).
+
+2. PRERREQUISITOS::
+
+     Además de un sistema LFS completo, los siguientes paquetes y sus
+  dependencias son necesarios para esta herramienta:
+    - requeridos: libxml2, libxslt, DocBook XML DTD
+    - recomendados: wget (para descargar los tarballs de los paquetes) y sudo (para
+      construir como usuario)
+    - opcionales: lynx (permite leer el libro linealizado generado), GPM (para
+      cortar y pegar comandos del libro), git (para actualizar las fuentes
+      del libro)
+  Ten en cuenta que las dependencias opcionales son recomendadas para facilitar el uso de la
+  herramienta.
+
+     También deberías tener las siguientes habilidades personales:
+    - Capacidad para escribir y depurar scripts de shell: como se dijo en la introducción,
+      no todos los scripts generados pueden usarse directamente. Necesitan ser
+      editados para producir una construcción libre de errores.
+    - Capacidad para depurar fallos de construcción, como dependencias faltantes o
+      directorios de instalación no conocidos por el sistema (cuando instalas en
+      /opt por ejemplo).
+    - Capacidad para elegir las herramientas que necesitas para configurar y administrar
+      tu sistema: en el libro BLFS, nada es obligatorio, nada es inútil. Estás por tu
+      cuenta a la hora de elegir qué construir, pero las decisiones incorrectas pueden
+      llevar a un sistema no funcional...
+
+3. INSTALACIÓN::
+
+     Hay dos formas de instalar las herramientas BLFS en un sistema LFS, descritas
+  en los párrafos 3.1 y 3.2, respectivamente:
+
+  3.1 INSTALACIÓN EN UN SISTEMA LFS EN EJECUCIÓN
+
+     Selecciona "Use Book --> Beyond Linux From Scratch" en el menú de jhalfs:
+  Las herramientas se instalan en $HOME$BLFS_ROOT (el valor por defecto para $BLFS_ROOT
+  es /blfs_root). El libro BLFS se descarga o copia a su directorio.
+  El directorio de seguimiento (ver abajo) es creado (si no existe
+  ya) e inicializado. Antes de ejecutar "make", deberías asegurarte de que
+  el directorio de seguimiento (ubicación predeterminada /var/lib/jhalfs/BLFS) puede ser:
+    - ya sea creado por el usuario que ejecuta "make", si no existe
+    - o que es escribible por el usuario que ejecuta "make", si existe.
+
+  Después de la instalación, deberías realizar los siguientes pasos adicionales:
+    - Configurar sudo, añadiendo los privilegios necesarios para el usuario (una posible
+      entrada de /etc/sudoers se da en README).
+    - Aunque no es estrictamente necesario, se recomienda instalar
+      los archivos de inicio del intérprete de comandos bash (como en `Problemas de
+      Configuración Después de LFS' del libro BLFS), ya que algunas instrucciones en BLFS confían
+      en que estén presentes. Ten en cuenta que pueden instalarse usando la herramienta
+      al seleccionarlos en el menú.
+    - En este punto, la herramienta no tiene forma de saber qué versiones de paquetes {B}LFS
+      están instaladas, por lo que la interfaz del menú mostrará todos los
+      paquetes, como si no estuvieran instalados.
+      Puedes darlos a conocer al sistema ejecutando el script
+      update-installed.sh e introduciendo los paquetes instalados con
+      su versión en el menú. Ten en cuenta que normalmente se supone que todos los
+      paquetes LFS están instalados, y puedes usar <A> en la casilla de
+      verificación del menú para seleccionarlos todos.
+    - Otra forma de hacer que el sistema conozca los paquetes instalados es
+      crear archivos vacíos con los nombres <paquete>-<versión-instalada> en el
+      directorio de seguimiento, y ejecutar la herramienta. Esto puede ser útil para
+      solo algunos cuantos paquetes.
+
+  3.2 INSTALACIÓN AL CONSTRUIR LFS
+
+  Al ejecutar el menú de LFS, hay una opción para instalar las herramientas BLFS
+  justo después de construir el sistema LFS: simplemente marca `BOOK Settings/Add blfs-tool support' en
+  el menú de configuración de jhalfs. Las herramientas se instalan en $BLFS_ROOT
+  (por defecto /blfs_root) en el sistema LFS, y las dependencias se construyen
+  al final de la ejecución de jhalfs, antes de las herramientas personalizadas.
+
+  Después de arrancar el nuevo sistema LFS algunos pasos son necesarios para finalizar
+  la instalación de las herramientas automatizadas (un ejemplo de herramienta personalizada
+  "950-userconf" en custom/examples permite realizar todos los pasos hasta
+  la configuración de /etc/sudoers):
+
+    - Una cuenta de usuario debe ser creada. Debes estar conectado en esa cuenta
+      de usuario para usar blfs-tool. Esto no es estrictamente necesario,
+      puesto que los paquetes pueden ser construidos como root también, pero
+      nunca es buena idea construir paquetes como root.
+
+    - Mueve /blfs-root a la carpeta de inicio de ese usuario (home) y cambia la propiedad de
+      ese directorio y los archivos al usuario.
+
+    - Da al usuario privilegios de lectura y escritura sobre el directorio
+      $TRACKING_DIR y los archivos que contiene.
+
+    - También todos los archivos bajo /sources deberían ser legibles y escribibles
+      por el usuario.
+
+    - Todas las ocurrencias de /blfs_root en el archivo de seguimiento (por defecto
+      /var/lib/jhalfs/BLFS/instplg.xml) deberían ser reemplazadas con
+      /home/<usuario>/blfs_root después del traslado. Esto también se debería hacer
+      en el archivo "configuration" en ~/blfs_root, a menos que este archivo sea
+      completamente borrado para empezar de nuevo.
+
+    - Configurar sudo y añadir los archivos de inicio de bash, como se describe
+      arriba (la herramienta puede ser usada para realizar los archivos de inicio de bash)
+
+    - Ten en cuenta que las versiones de todos los paquetes instalados son automáticamente
+      conocidas por la herramienta en este caso, y no hay necesidad de ejecutar el
+      script update-installed.sh.
+
+  Asumimos que las herramientas BLFS se usarán en un sistema LFS arrancado.
+  Usarlas para construir paquetes BLFS en una jaula chroot también es posible,
+  pero no está soportado.
+
+  3.3 DISEÑO DEL DIRECTORIO EN EL DIRECTORIO $BLFS_ROOT
+
+    README.BLFS                 este archivo
+    TODO                        notas de desarrolladores (bueno, no se actualizan muy a menudo)
+    blfs-menu.patch             parche para menu/menuconfig.py para mostrar letras más
+                                explícitas en los menús
+    gen_pkg_book.sh             resuelve dependencias, genera un libro BLFS lineal,
+                                y finalmente genera scripts de construcción
+    gen-makefile.sh             genera el Makefile objetivo
+    progress_bar.sh             la barra de progreso del Makefile objetivo
+    gen-special.sh              Script de ayuda para generar la base
+                                de datos del paquete
+    Makefile                    Usado por make para actualizar la base de datos de paquetes
+                                desde el árbol GIT, luego lanza la interfaz menuconfig,
+                                y ejecuta gen_pkg_book.sh basado en las configuraciones
+    packdesc.dtd                un DTD sencillo describiendo el formato de la
+                                base de datos del paquete y el archivo de seguimiento
+    update-installed.sh         Ejecútalo para actualizar la base de datos de paquetes instalados
+                                sin tener que actualizarlos en el sistema
+    blfs-xml/*                  árbol GIT de la versión elegida del libro BLFS
+    lfs-xml/*                   árbol GIT de la versión elegida del libro LFS
+    lib/constants.inc           librerías de funciones
+       /func_dependencies         para construir el árbol de dependencias
+    menu/*                      código fuente para menuconfig
+    xsl/gen_pkg_list.xsl        hoja de estilos XSL para generar la base de datos de los paquetes
+       /gen_config.xsl          hoja de estilos XSL para generar el archivo Config.in
+                                para usarse en el sistema menuconfig
+       /gen_newpack.xsl         hoja de estilos XSL para generar el archivo newpack.in
+                                para usarse en el sistema menuconfig, cuando se
+                                actualizan paquetes instalados
+       /dependencies.xsl        hoja de estilos XSL para generar la lista de dependencias
+                                de un paquete
+       /make_book.xsl           hoja de estilos XSL para generar el book.xml lineal
+       /lfs_make_book.xsl       hoja de estilos XSL para incorporar páginas LFS dentro
+                                del book.xml lineal
+       /scripts.xsl             hoja de estilos XSL para generar los pequeños scripts
+                                de book.xml
+       /bump.xsl                hoja de estilos XSL para actualizar el archivo de seguimiento
+       /process-install.xsl     hoja de estilos XSL incluida por scripts.xsl, para
+                                mostrar claramente las instrucciones de instalación
+       /process-replaceable.xsl hoja de estilos XSL incluida por scripts.xsl, para
+                                generar instrucciones correctas cuando una etiqueta
+                                <replaceable> es encontrada.
+
+  Archivos de trabajo: varios archivos se generan al ejecutar la herramienta por primera vez:
+
+    packages.xml            base de datos de paquetes autogenerada
+    Config.in               archivo de entrada para las opciones basadas en menú
+    configuration           archivo generado por el proceso menuconfig
+    dependencies/*          archivos que registran el árbol de dependencias
+    book.xml                el libro linealizado
+    book-html/*             el libro linealizado renderizado en html
+    scripts/*               los pequeños scripts creados
+
+  3.4 SISTEMA DE SEGUIMIENTO DE PAQUETES INSTALADOS:
+
+       Esta herramienta incluye un sistema de seguimiento muy simple para registrar qué paquetes
+    se han instalado utilizando la herramienta. Se usa para omitir paquetes instalados del
+    menú de selección de objetivos y para probar si un paquete instalado se ha
+    actualizado en el libro BLFS. No dependas de esta característica como un gestor de
+    paquetes general.
+
+       El sistema de seguimiento en sí es un archivo XML: instpkg.xml. Es
+    inicializado la primera vez que se ejecuta <make> en blfs_root. Reside en un
+    directorio, que se crea si es necesario durante el proceso de construir
+    herramientas personalizadas o dependencias de blfs, justo después de LFS. Puedes
+    especificar la ubicación de ese directorio en el submenú de herramientas-blfs de
+    jhalfs. Puede que necesites actualizar los permisos y/o la propiedad
+    de este directorio antes de usar la herramienta blfs (ver README en jhalfs).
+
+       La ubicación por defecto del directorio de seguimiento es /var/lib/jhalfs/BLFS.
+    NOTA: después de la construcción inicial, ese directorio solo se usa para contener
+    instpkg.xml, a menos de que se hayan construido herramientas personalizadas. En el
+    segundo caso, también contiene archivos vacíos cuyos nombres son
+    "$PKG-$VERSION" para cada paquete versionado construido. La información sobre
+    esos paquetes es incluida dentro de instpkg.xml la próxima vez que se
+    ejecute la herramienta.
+
+4. USO::
+
+       De ahora en adelante, todo el trabajo debe ser realizado desde dentro del directorio
+    raíz de instalación.
+
+       Debido a la complejidad del libro BLFS, la generación de scripts y Makefile
+    se hace en varios pasos:
+
+  4.1  ACTUALIZACIÓN DE LAS FUENTES DEL LIBRO::
+
+       Si estás usando la versión de desarrollo del libro y quieres actualizar
+    paquetes instalados a la versión más reciente hallada en ese libro, necesitas
+    actualizar los archivos XML fuente y la base de datos de paquetes. Para hacer
+    esto, ejecuta "make update". Esto no es necesario si acabas de construir
+    LFS, y podrías saltarte esto hasta el paso 4.2.
+
+       En la siguiente pasada de configuración, los paquetes que ya estaban instalados
+    pero ahora listados con una nueva versión en el libro estarán disponibles en
+    la selección de objetivos y ser usados para resolver dependencias.
+
+  4.2  CONFIGURACIÓN Y ANÁLISIS DEL LIBRO::
+
+       El siguiente paso es crear el libro y construir los scripts en un orden funcional
+    de construcción de dependencias para uno o muchos paquetes.
+
+       Ejecuta <make> para dar inicio a la interfaz de configuración. El menú
+    principal contiene cuatro bloques: selección individual de paquetes, ajustes
+    de Construcción, diseño de Construcción y Optimización.
+
+       En el bloque de opciones del paquete, los menús y submenús están
+    organizados como partes, capítulos y secciones del libro. Puedes
+    navegar a través de los menús y seleccionar el número de objetivos que desees.
+    Sin embargo, sugerimos que no se seleccionen muchos al mismo tiempo de manera
+    que se puedan arreglar errores si surgen. Fíjate de que todos los
+    paquetes bajo un submenú pueden ser seleccionados en grupo si se selecciona "<A>"
+    en la caja de comprobación.
+
+       En el submenú de "Ajustes de Construcción" (Build settings), el nivel
+    de dependencias y los paquetes por defecto para ser usados para la resolución
+    de problemas es seleccionado (de manera actual, esto se halla para
+    solamente MTA). También puedes seleccionar si es que la construcción
+    progresará como las configuraciones lo dirigen o si lo haces bajo root, y
+    si decides quitar ".la" archivos, y también si estadísticas de un
+    paquete van a ser compiladas (hora de término, el rastro de la memoria RAM
+    y "DESTDIR" instalaciones). Si estás usando un manipulador o
+    creador de paquetes, puedes acceder la dirección del packInstall.sh el
+    script a la función.
+
+       En el menú "Diseño de Construcción" (Build layout), podrás seleccionar
+    dónde residen los tarballs fuente y hacia dónde son transferidos después de
+    ser descargados, también es posible designar dónde serán instaladas y
+    si después de completadas las actividades, el árbol retiene los procesos
+    después de haber servido su propósito.
+
+       En el menú final, "Configuraciones de Orden" u "Optimización",
+    tendrás control del número de comandos simultáneos, o bien modificar
+    valores estándares como "CFLAGS, CXXFLAGS" y finalmente las banderas de enlace.
+
+       ¡Atención! Hay cadenas de explicación en todos los menús de ayuda de los
+    elementos. ¡Por favor procede al leer y educarte con los manuales para entender
+    estos procesos!
+
+       Aquellos de los perfiles son documentados en tu memoria y te servirán para
+    cuando decidas arrancar los sistemas pre configurados nuevamente.
+
+       Cuando hayas concluido con todo en el menú, bastantes revisiones y chequeos
+    se activan en progreso. Mientras todo sucede, la cadena de interdependencia
+    se activa, la que mostrará sus prioridades según se ha declarado o de requerimiento,
+    y será clasificada bajo parámetros (externos, preferidos o requisitos adicionales, o
+    básicos sin uso forzoso) luego su perfil numérico subirá sus niveles. Una vez sean
+    vistos de esta parte al segundo, te indicamos desde entonces, nivel 2 como la prioridad
+    principal de instalación o 3 y así por consiguiente. Luego las circulares se formarán por
+    lo que debes escoger el nivel. O si no simplemente la predeterminada toma este rol y
+    completa el trabajo usando niveles superiores. Esto se aplica solo si son prioridades.
+    Se toma un balance para poder seguir.
+
+       Conseguirás un archivo final resultante llamado "book.xml" cuando termines que contiene el libro en formato lineal,
+    y un archivo HTML renderizado, en el directorio resultando bajo el nombre book-html, el cual puedes ir utilizando
+    a través del navegador en caso de necesidad "lynx book-html/index.html" o puedes seleccionar cualquiera de los de
+    otros sistemas que dispongas y prefieras.
+
+       Todavía nos encontramos aquí, nos situamos en la carpeta resultante de su parte llamada "scripts", la cual da de hecho una serie de documentos autogenerados
+    sobre lo construido y empaquetado y se presentan como minitareas programables de este evento final como resultado
+    o scriptlets que se hallan adjuntos en su función.
+
+       Junto a aquella halla otra llamada comúnmente en referencia "dependences" en tal la que da una compilación
+    o reporte por archivos creados durante el paso intermedio al momento de hallar resoluciones funcionales o soluciones resultadas a aquellas ramas o tareas
+    para los perfiles de interdependencia adjunta como respuesta funcional por cada evento de sistema resuelto de la parte respectiva del libro.
+
+  4.3  EDICIÓN DE LOS SCRIPTS DE CONSTRUCCIÓN::
+
+       En este punto, pasaremos a la etapa donde realizamos revisados por pasos funcionales para asegurarnos si se necesita de
+    proyectados los parches debidos a los errores comunes si se pueden hacer su corrección sin o con esfuerzo de antemano de un
+    código fuente funcional o solo corregido a modo personal con ayuda exterior con soporte debido, solucionado.
+
+       De igual método podemos realizar procesos idénticos al inyectar líneas operacionales a modo complementario desde exterior en modo código para que un sistema trabaje conjuntamente si fuera ajeno o extra
+    o si queremos que paquete tipo "bar" arranque en anticipación al "foo", si notamos un proceso bajo de nombre de código llamado "064-z-foo" de construcción
+    únicamente y solo por nombrar algo debemos en su contrario armar el primeramente en función pre requisito que el original con algo que empiece antes que esto un "064-y-bar" al ser letra anterior.
+
+       Ten presente esto sin falta: los medios adjuntos de información o gestores y monitores base de paquetería
+    solamente son limitados por lo expuesto o conocido a modo funcional del archivo o perfil que pertenece bajo libro y ningún otro BLFS, no sabrán su rol en estos procesos, o qué pueden hacer solos y a modo no funcional.
+
+  4.4  CREACIÓN O FORMACIÓN DEL MAKEFILE FUNCIONAL Y OBJETIVO DEL COMANDO CONSTRUCTIVO::
+
+       Se genera cuando todos aquellos procesos nombrados acaban satisfactoriamente con luz verde, y por tanto, dan
+    como un resultante del proceso o final que podrá accionar desde dentro si creamos a su vez el contenedor que será asignado, vacío de preferencia
+    por un directorio como ("mkdir work" un trabajo por dar ejemplo de un nombre de tarea) para luego pasar a dar uso al script final "../gen-makefile.sh" de un directorio con este perfil
+    como un directorio temporal del mismo y nos mostrará un documento, de esta forma lo tenemos vacío sin error el cual nos evitará sobre escrituras perjudiciales
+    en caso de no estar pre formados prestando una mano para el nombre temporal inicial comúnmente un uso general bajo "start/work".
+
+    Nos ocupamos a partir de aquí como tarea principal de examinar sus usos en caso y con suerte y que resulte lógico para que esto pase y poder seguir de largo todo ello
+    iniciar construcciones por arranques final a manos usando lo debido "make" sin excepciones a errores previstos tras completarlo a plenitud y funcionalmente correcto para esta ocasión.
+
+5. LOS SCRIPTS FUNCIONALES (SCRIPTLETS) POR REPORTE ACERCA DE SU FORMA COMPILATORIA FINAL Y DE DESEMPEÑO EN CONSTRUCCIÓN Y SUS INCONVENIENTES Y CAUSAS PARA GENERAR FALLOS RESULTADOS CÓDIGO::
+
+      Aquí podemos describir sin reservas todos problemas previstos y sin solucionar actualmente sobre sus efectos secundarios no deseados como parte general funcional que se derivan en la mayoría o sin excepcion
+   que acarrean procesos o fallos compilatorios ya sea pre hechos en configuración de fábrica sin advertencia en base
+   de donde partimos sin excepciones con todos detalles sin saber que los procesos y métodos son inflexibles que pueden terminar rompiéndose temporal. Y en muchos o general a la regla básica si notaste a priori e infausto evento o parte esto
+   hacerlo o preeditar un scriptlet o en este modelo de código adjuntos de ellos, este proceso al cual uno incurrirá será sin falta o de necesidad general a ser un procedimiento de tipo compulsorio y general y obligadamente en caso ser hallado de origen del error.
+      Por ende requerirá que tú a veces actúes a lo pronto e inserte un propio scriptlet personal de origen general en vez de predeterminado en reemplazo de origen el script no proveído funcional y dar soluciones o una remoción unificada a esta serie para no estar en traba ni con la instalación u otra clase
+   u otra adicción inútil indeseable u obligatoria indeseada del proceso de instalación no querido (un extra por sobrepuesto u algo que no se debe y que se instaló y si esto sucediera bajo parte indeseada pero requerida del todo se nos daría otra ruta a través u lazos y uniones interdependientes como obligatoria o con excepciones, entre "or" un extra a la selección como alternativa pero impuesta).
+      Al presentarse problemas o por cadenas con fallas mutuas interdependientes o ciclos de circulares de la cadena repetidos a pesar de que este lazo extra funcional en manual dice lo contrario y siendo no conocidos como interdependencia o opcional a proceso funcional o sin excepcion alguna te verás en obligación a cambiar (y se forma esto de tipo lazo de uso opcional y no documentado general comisionando que cambie o muevas archivos),
+   script de lugar así al arrancar hagan y el script funcione al origen en donde están A pasen a perfil modelo scripts con tipo scripts lazo de función final idéntica tipo script script A a script B luego B hacia y de último script modelo y de función para A de nuevo modelo que cierre como círculo para su corrección o método a esto y al final cambiar los perfiles que terminan en terminaciones por nombres tipo letras por ejemplo y por algo que dice xxx-a- al campo a rellenar usando modelo tipo copia a esta base. y si en el peor e inseguro caso, todo se arruinará de paso y sería imposible si ya el usuario arranca un "work" no deseado este proceso generaría error del libro por generar la meta sin finalizar su base previamente al hacerlo sin cuidado se previene todo no comisionando el mismo un Makefile temporal a base antes del inicio para esto ser realizado de esta base desde ahí y del cual arranca y de trabajo general un temporal bajo uso asignado de work a modo base a prevenir desastres de base temporal de proceso para eso se crearía uno sin error y uso.
+
+   5.1  PROCESOS START UPS DESDE LOS SCRIPTS BASE PARA LA ZONA BOOT Y DESDE BLFS DE PARTIDA COMO LA BASE DEL DESARROLLO ARRANQUE Y PROYECCIÓN OPERACIONAL Y PARA QUE NO DEN INCONVENIENTES CON LA GENERACIÓN FUNCIONAL E INTEGRIDAD Y FUNCIONES AL CONSTRUIR EN UN BLFS MODO MODELO Y PROLONGACIONES DEL BLFS SCRIPTS (BLFS BOOTSCRIPTS)::
+
+        El proceso puede en principio tener funcionamiento con sus puestas sin error alguno, y por el lado u otro o en general también, si no posees su manual en parte base o por ejemplo el modelo a la par sin las instrucciones, tú requerirás de forzar estas cosas a mano insertar y para el uso funcional u o para la función del manual el comando pre base tipo forma o nombre que siga /etc/init.d/rc.d/<initscript> para que luego finalices y se arranque la orden "start" en base a punto temporal en los procedimientos de proceso de esta instrucción.
+
+   5.2  CONFIGURANDO Y COMPORTANDO CÓMO TODO UN TIPO A SER UN COMPONENTE DE LA MISMA O UNA EDICIÓN O MODO INSTALADOR PRE PERFIL CONFIGURANDO PROCESOS A MODELO DE CONFIGURACIÓN DEL SISTEMA OPERACIONAL PRE ARMADO A UN SISTEMA DEL TRABAJO TIPO MODELO (PACKAGE CONFIGURATION)::
+
+        Aquéllos que tienen base en funciones tipo bajo etiqueta tipo Configuración funcional "Configuration" sus variables los van guiando u opciones, tú requerirías una propia adaptación por las variables requeridas. Al presente a día hoy sólo están disponibles los que configuren procesos desde las fuentes remotas o el espacio "red" o también internet llamados por un perfil o forma o el uso archivo de tipo redes "network" de uso que serán los que necesitarán sus pasos corregidos en edición base manual u forzoso (wpa_supplicant,
+     dhcpcd, ...).
+        Por último pueden resultar cambiándose sin duda los comandos "bash startup file" y arrancar. Para evitar esos procesos indeseados desde script pre-generado por esta vía u original la misma hace e inserta base a modo orden de 'source /etc/profile', de lo que garantice el paso correcto a versión del inicio a perfil reciente en proceso y se pueda dar fin al problema en inicio al paso de "bash startup".
+
+   5.3  RECURSO O MÓDULO ADICIONAL Y SU PERFIL XORG VERSION SIETE PROYECCIÓN DE VERSIÓN Y SU COMPONENTE INTEGRADO (XORG7)
+
+        Presentan características que pueden desarticular formas base e interrumpen o tienen un diseño singular a todo paso original que este herramienta tomaría con uso o forma si se tomase una línea directa al proceso o sus partes. Y lo solucionarán de facto partiendo del menú dividiendo sus problemas general y particular o base al proceso en la vía a componentes o piezas sin uso único la forma de paquetes pequeños para la vía lineal desde la fuente manual este es desarmado. Con una forma elegida manual la vía predeterminadamente a través opciones de esta forma podrá hacerlo desde el menú a piezas que lo constituyen con elección simple o única a estas funciones e independientes los unos de sí para armarlos luego individual.
+
+        En base de esto lo cual quieres usar en total o componente Xorg del tipo nivel séptimo capítulo, usar e inclinar al componente "xinit". Su base será el de dependiente a recomendar y un requerimiento sugerido funcional o cadena dependiente el causante que atraiga esto y se forme para usar y generar un ambiente que aísle e incorpore todo de una misma función general set y piezas funcionales de Xorg en una pieza completa desde fuentes base.
+
+   5.4  RECURSOS MODIFICATIVOS POR INYECCIÓN DE MODIFICACIONES DESDE SUS CÓDIGOS CORRECCIONAL AL TIEMPO POR FUNCIONES BASE PARCHES O PRE FORMA ACTUALIZADA TIPO CAMBIO TEMPORAL A PARCHES (PATCHES)
+
+        De ser posible no arranques desde la incertidumbre asegúrate tú si pueden haber de todas un comando si tienes este un programa, por parche a modo o de la fuente que tenga uno en parche del módulo de esto descargar un código u operarlo. Por uso en algunos al perfil y perfil modelo del lugar en el libro estos no existen temporal. y a base perfil o parte final a versión de libros recientes BLFS su perfil o de parte del octavo a su final (8.0), sus métodos al paso todo sin ninguna faltarán están bajo proceso de manera funcional descargables ya.
+
+   5.5  PRIVILEGIOS A USO Y MANEJO EN ADMINISTRACIÓN ROOT TIPO FUNCIÓN COMANDO BASADO PARA ADMINISTRADOR ROOT EXCLUSIVO EN LA RAÍZ AL ROOT
+
+        Normal u ocasional como estándar por lo pronto tu actuar puede estar en rango corriente u ordinario ("normal user"), o por no poseer privilegio a las reglas usa esto a forma como requerimiento bajo un usuario en donde no los hay y fíjate por encima, usa este con los procesos sudo a usar todos obligados sin omitirlos comandos si estás sujeto privilegios en una jerarquía u modo para todo comando raíz e implementas procesos los verifiquen antes, también deben verse todo a línea visión desde vía "PATH" hacia forma comando, como base se preforma al ser anexado con cuidado desde este modo a ser a perfil /usr/sbin o por forma normal uso de adición base "PATH". Si están ahí y es normal podrán correr un normal administrador al no sufrir estos rechazos si este va así y operaría privilegiadamente comandos sin restricción base.
+
+        Una serie de instrucciones y scripts forman comandos con privilegio lo que al envolver a este "wrap" como perfil base o a la forma de uso formará el método a sí forma como perfil y con cadena con:
+       sudo -E sh -e << ROOT_EOF
+         <comandos o todo a modo uso comandos a ser un administrador de ejecución por raíz u root root que tendrán todos su perfil base en `$', ``', y junto y más la `\' omitidos a modo tipo salida escape uso temporal de variable que escapan en esta o perfil la forma>
+       ROOT_EOF
+     Lo usado como "-e" y pre añadido va unificado al comando conmutador de función "sh" de los pasos el hacer salida con terminaciones hacia a un evento temporal un "exit" se genere desde "error" originará con su falla pre salida este uso que de antemano el programa pre detecta y así su final de este método al error de comando si la salida no da frutos da origen y detiene esto por causa natural temporal si así su uso un error sucede u originó para todo el comando a los bloques a uso temporal pre comandos detenga pasos, mientras "-E" en cambio en el lado uso "sudo" con función pre usa modo u perfil asegura pasos e inicio un proceso ambiente de toda la zona "ambiente entorno ambiente environment pre todo entorno de sistema" que no decaiga "escape" pre asegura al entorno pase y uso la orden de privilegio a comandos tipo administrado o que tengan pasos root comandos. Su funcionamiento puede y al ser si está o sólo su efectivo al "uso eficaz activo" al tiempo temporal momento instante y a tiempo /etc/sudoers pre existe lugar o de la zona y contenga allí "Defaults setenv", al que de modo u perfiles uso el modo en SETENV en atributo usar y poder "user" a usuario su entorno este "ALL". Tu elección u opcional que lo denifiques para esto pre función en este modo se preve un "fallo uso en sistema su debilidad sistema por ser uso seguridad" un perfil de rechazo "forbid" en la zona "/etc/sudoers" si puedes omitir o denegar. al tiempo pre tu uso tendrás en lugar y uso al `$' uso y de la variable originado al lugar ambiente zona lugar desde su entorno ambiente en "uso ambiente enviroment environment uso" a su orden u "uso instruido" a su entorno uso instruccion, de ser este método y modo función "uso función" por tener algo que en parte de su modelo muy robusto "fuerte firme estricto" temporalmente da la parte este una opción "puedes dar modo o una opción y tener un lugar de rechazo uso fallo posible en un extremo" y así su lugar "en caso extremo raro esquina" lugar extremo que pre falla origen y causa una forma de error a caso "corner case". su caso al dar causa de fallas es ser usado revisar esto al precaución un nivel "suma cautela" el "paso a uso orden".
+
+        Debido que desde un libro de uso su diseño libro tipo un diseño a formato problemas u "problemas por base formato libro layout" puede causar o dar lugar uso sudo temporal dar sudo como orden o como uso y comando se ausenten pierdan este paso sin orden sudos a sudo a caso ocasional o parte pasos temporales.
+
+   5.7  OTROS PROBLEMAS OCASIONALES U OPUESTAS DE LA CADENA U OTRA (OTHERS)
+
+        Puede generar y tener cosas lugar esto o a lugar u otra zona sin solución de parte problemas e de uso origen o cuestiones "problemas temas issues asuntos" problemas u cosas cual a nuestra de su parte lugar estemos ignorantes y pre ignora zona caso lugar "somos o estaríamos uso por nuestro de antemano sin conocer ajenos" ignorantes pre "ajenos uso ignorantes aware" sin causa de lugar. de ser así su hallazgo dar "al dar" a uso su origen reporte hacia su dirección en paso <alfs-discuss@linuxfromscratch.org>.

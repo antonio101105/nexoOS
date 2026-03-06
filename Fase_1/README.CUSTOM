@@ -1,0 +1,261 @@
+	CÓMO AÑADIR SCRIPTS PERSONALIZADOS AL MAKEFILE DE JHALFS
+
+
+  Normalmente JHALFS crea un Makefile conteniendo únicamente aquellos scripts encontrados
+en los libros {,B}LFS. Una herramienta de construcción automatizada no puede predecir las
+necesidades de cada individuo y se hacen peticiones "Puedes añadir el paquete xxxx".
+En lugar de añadir numerosos scripts de paquetes e interruptores para cada petición,
+era más fácil añadir una herramienta para que los usuario(s) codificasen sus propias necesidades
+de paquetes.
+
+  Hay dos áreas que pueden ser personalizadas: cómo se construye el sistema base
+y qué configuraciones y paquetes adicionales requiere tu hardware para
+poder arrancar y funcionar. Cada una de esas áreas se maneja de una manera diferente.
+
+
+
+        PERSONALIZACIÓN DEL SISTEMA BASE
+
+  Hay dos maneras de alterar cómo se construirá el sistema base:
+
+  - Utilizando una copia de trabajo de las fuentes del libro y editando los archivos XML.
+    Esta es la forma usada por los editores de libros para probar actualizaciones de paquetes,
+    cambios de comandos, cambios de orden de construcción. etc.
+
+    Este método requiere que conozcas muy bien las fuentes de los libros y qué
+    archivos necesitan ser editados. No será discutido aquí.
+
+  - Editando los scripts de construcción generados para hacer cualquier cambio que desees.
+    Este es el método discutido a continuación.
+
+
+  EDITANDO LOS SCRIPTS BASE
+
+  Para empezar, los scripts de construcción deberían generarse con los valores por defecto
+del libro. Para hacer eso, configura jhalfs activando cualquier opción que desees
+que sea incluida, pero no selecciones la opción "Ejecutar el Makefile" ("Run the Makefile").
+
+  Bajo el directorio ${BUILD_DIR}/${SCRIPT_ROOT}/$COMMANDS
+(usando los valores por defecto para hacer una construcción LFS, el nombre de ese directorio es
+/mnt/build_dir/jhalfs/lfs-commands) encontrarás los scripts de construcción por defecto.
+
+  Si todo lo que quieres es modificar, añadir, o eliminar algún comando de una instalación
+de paquete, por ejemplo para cambiar su línea de ./configure, simplemente edita el script
+relacionado. Si cambias o añades un parche, asegúrate de copiar el nuevo parche al
+directorio ${BUILD_DIR}/sources. Cuando termines, ejecuta 'make' desde dentro del
+directorio ${BUILD_DIR}/${SCRIPT_ROOT}.
+
+
+  REEMPLAZANDO O INSERTANDO PAQUETES Y CAMBIANDO EL ORDEN DE CONSTRUCCIÓN
+
+  Para eliminar un paquete del sistema, simplemente elimina su(s) script(s).
+
+  Para cambiar la versión de algún paquete, o para construir una versión más nueva o vieja
+que la del libro, edita ${BUILD_DIR}/${SCRIPT_ROOT}/pkg_tarball_list para cambiar su
+nombre de tarball y coloca el nuevo tarball en el directorio ${BUILD_DIR}/sources.
+
+  Para reemplazar un paquete por uno equivalente, renombra el script del paquete reemplazado
+para reflejar el nuevo nombre del paquete (por ejemplo, 102-man-db -> 102-man), edita el
+script para hacer los cambios de comandos requeridos, coloca el nuevo tarball en el
+directorio ${BUILD_DIR}/sources, y edita el archivo ${BUILD_DIR}/${SCRIPT_ROOT}/pkg_tarball_list
+para reemplazar el nombre de tarball del paquete eliminado por el nuevo nombre de tarball del paquete.
+
+  Para cambiar el orden de construcción, renombra los scripts cambiando la cadena de los
+primeros 3 dígitos hasta que estén ordenados en la forma que desees.
+
+  Para insertar un nuevo paquete, por ejemplo para construir Cracklib con el propósito de
+construir Shadow con soporte Cracklib, primero deberías decidir antes de qué paquete necesita
+ser instalado, en este ejemplo 107-shadow. Luego crea un nuevo script conteniendo los comandos
+necesarios, utilizando uno existente como plantilla, y nómbralo con la misma cadena de 3
+dígitos utilizada para ese paquete por defecto mencionado, pero añadiendo otra cadena de
+1 dígito. En nuestro ejemplo, el nuevo script para construir Cracklib antes de Shadow se
+llamará 107-1-cracklib. Este esquema de nombrado permite insertar hasta 10 scripts antes
+de cada uno de los scripts existentes. Coloca el tarball para el nuevo paquete y los
+parches requeridos, si los hay, en ${BUILD_DIR}/sources y edita
+${BUILD_DIR}/${SCRIPT_ROOT}/pkg_tarball_list para añadir el nombre del tarball para ese paquete.
+
+  Cuando estés listo, arranca de nuevo la interfaz de configuración de jhalfs. Asegúrate de
+que estén seleccionadas exactamente las mismas opciones que cuando generaste los scripts
+de construcción por defecto. Asegúrate de que "Reconstruir archivos" (Rebuild files) esté
+deseleccionado y selecciona "Ejecutar el Makefile" si lo deseas. Luego selecciona
+"Reconstruir el Makefile". Esto creará un nuevo Makefile en base a los cambios que
+hiciste a los scripts de construcción.
+
+
+       AÑADIENDO ARCHIVOS DE CONFIGURACIÓN POST-CONSTRUCCIÓN DEL SISTEMA Y PAQUETES EXTRA
+
+  La instalación de los paquetes BLFS está manejada mediante blfs-tool y es activada
+cuando seleccionas la opción de menú apropiada. Ver README y README.BLFS para más
+información.
+
+  La característica descrita abajo fue añadida para que los usuarios pudieran instalar archivos
+de configuración restantes, construir los paquetes necesarios para acceder a Internet
+o para dar soporte a hardware específico, o para instalar utilidades básicas que son
+necesarias desde el inicio, y no pretendía reemplazar al sistema de instalación BLFS.
+
+  DISEÑO
+  Un nuevo directorio ha sido añadido al árbol de JHALFS que contiene los
+scripts de configuración y un par de ejemplos. Un interruptor ha sido añadido
+al archivo de configuración que activa/desactiva la inclusión de scripts personalizados.
+
+    custom
+      /config          <-- donde poner tus scripts.
+      /examples        <-- algunos scripts de ejemplo
+      template         <-- TODOS los scripts DEBEN parecerse a este
+
+
+  NOTA::: Tú eres responsable de incluir todas las dependencias y asegurarte de que
+          se construyen en el orden correcto.
+
+  1. Para añadir un paquete al Makefile final de JHALFS debes primero crear un archivo
+     en el directorio custom/config. El directorio custom/config puede necesitar ser
+     creado primero.
+       **Todos los archivos de configuración DEBEN seguir la convención de nombrado, xxx-PKG,
+       donde xxx es el número de orden y PKG es el nombre del paquete. El formato de
+       nombre de archivo es importante ya que define el orden de construcción. El ejemplo
+       mostrado abajo tiene un número de orden 950 y los archivos de registro se listarán en
+       orden alfabético en el directorio /logs posteriores a los scripts blfs-tools.
+     El método más simple es copiar el archivo plantilla en el directorio de
+     configuración y renombrarlo.
+
+  2. Rellena las variables con los valores necesarios.
+       La función de la variable es autoexplicativa. Las variables PATCH deben ser
+       numeradas, comenzando por PATCH1 (hasta PATCH10). Si el valor de la suma
+       de verificación (checksum) md5 es conocido, se puede añadir después del
+       URL como en (es necesario el uso de comillas):
+       PATCH1="http://patch-host/patch-path xxxxxxx..."
+
+  3. Comandos de construcción
+       Si el paquete que deseas incluir se encuentra en el libro BLFS entonces solo
+       necesitas copiar/pegar los comandos entre el texto xEOFx, de otra forma
+       necesitarás definir los comandos por ti mismo.
+     NOTA::: Este script que acabas de crear no es usable directamente pero contiene
+             toda la información necesaria para que jhalfs cree un script de construcción
+	     y una entrada en el Makefile de jhalfs.
+
+  4. Como se mencionó previamente el orden de construcción es dictado por el número
+     de 3 dígitos en el nombre del archivo. Si un paquete tiene dependencias debe ser
+     numéricamente mayor que los archivos dependientes.
+       ej. El paquete mc tiene a glib como dependencia, entonces el orden de construcción es:
+           950-glib
+           951-mc
+
+  5. Un archivo de configuración para BLFS-bootscripts ya está creado como 999-blfs_bootscripts.
+     Si un paquete requiere instalar un bootscript añade el comando a este
+     archivo y NO en el script del paquete. El script de gpm se incluye como
+     ejemplo de archivo de parche y la necesidad de un bootscript BLFS.
+
+
+  EJEMPLOS
+
+    Otros ejemplos pueden ser encontrados en custom/examples. Están fechados y
+    no mantenidos, pero pueden ser de utilidad al momento de crear tus propios scripts.
+
+
+#--------- GLIB ejemplo -----------
+
+  #
+  # Sintaxis del nombre de archivo xxx-PKG  ej. 950-glibc
+  # Crea un archivo en el directorio custom/config
+  # Rellena el archivo usando el siguiente script como ejemplo
+  #
+
+PKG="glib"
+PKG_VERSION="1.2.10"
+PKG_FILE="glib-1.2.10.tar.gz"
+URL="http://gd.tuwien.ac.at/graphics/gimp/gtk/v1.2/${PKG_FILE}"
+MD5="6fe30dad87c77b91b632def29dd69ef9"
+
+  # El código a continuación remueve las variables PATCHx previamente definidas
+for i in PATCH{1..10}; do
+   unset $i
+done
+  # Los parches son nombrados PATCH[1..10]
+  # Esta información es usada solo para descargar el parche
+PATCH1="http://www.linuxfromscratch.org/patches/blfs/svn/glib-1.2.10-gcc34-1.patch 0077a1cce5e8a2231ac5a9b08c6263ba"
+
+
+  # NOTA::
+  #  El enrevesado esquema utilizado para escribir hacia un archivo temporal es
+  #  un rodeo/remedio a causa de una restricción incrustada con la doble y sencilla comillas.
+
+( cat << "xEOFx"
+
+patch -Np1 -i ../glib-1.2.10-gcc34-1.patch &&
+./configure --prefix=/usr &&
+make
+make install &&
+chmod -v 755 /usr/lib/libgmodule-1.2.so.0.0.10
+
+xEOFx
+) > tmp
+
+
+#--------- GPM ejemplo -----------
+
+
+PKG="gpm"
+PKG_VERSION="1.20.1"
+PKG_FILE="gpm-1.20.1.tar.bz2"
+URL="ftp://arcana.linux.it/pub/gpm/gpm-1.20.1.tar.bz2"
+MD5="2c63e827d755527950d9d13fe3d87692"
+for i in PATCH{1..10}; do
+   unset $i
+done
+PATCH1=" http://www.linuxfromscratch.org/patches/blfs/svn/gpm-1.20.1-segfault-1.patch"
+PATCH2=" http://www.linuxfromscratch.org/patches/blfs/svn/gpm-1.20.1-silent-1.patch"
+
+
+( cat << "xEOFx"
+
+patch -Np1 -i ../gpm-1.20.1-segfault-1.patch &&
+patch -Np1 -i ../gpm-1.20.1-silent-1.patch &&
+./configure --prefix=/usr --sysconfdir=/etc &&
+LDFLAGS="-lm" make
+
+make install &&
+cp -v conf/gpm-root.conf /etc &&
+ldconfig
+
+# El cmd (comando) normal para instalar el script de boot (arranque) para gpm
+# --- PON ESTE CMD DENTRO de 999-blfs_bootscripts
+#make install-gpm
+
+cat > /etc/sysconfig/mouse << "EOF"
+# Begin /etc/sysconfig/mouse
+
+MDEVICE="/dev/psaux"
+PROTOCOL="imps2"
+GPMOPTS=""
+
+# End /etc/sysconfig/mouse
+EOF
+
+xEOFx
+) > tmp
+
+
+#--------- SOLO COMANDOS ejemplo -----------
+  # Este es un ejemplo de un script auto-contenido de comandos (cmd script)
+  # No hay referencia a un paquete o un directorio de paquete.
+  # Este método es de utilidad para crear perfiles/archivos/etc
+  # que pertenecen a un usuario en el tiempo de compilación/construcción.
+
+
+PKG=""
+PKG_VERSION=""
+PKG_FILE=""
+URL=""
+MD5=""
+for i in PATCH{1..10}; do
+   unset $i
+done
+PATCH1=""
+
+
+( cat << "xEOFx"
+
+echo "SOLAMENTE UN RASTREO QUE NO SIRVE DE NADA"
+
+xEOFx
+) > tmp
