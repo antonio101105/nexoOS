@@ -11,3 +11,20 @@ Se han utilizado exclusivamente los scripts de **jhalfs** (ALFS), los cuales per
 
 > [!IMPORTANT]
 > No se realizaron intervenciones manuales en los scripts de compilación durante esta fase para asegurar que el entorno sea 100% fiel a las especificaciones oficiales de LFS.
+
+---
+
+## 🚀 Instrucciones para Reproducir la FASE_1
+
+Si deseas replicar el entorno de construcción exacto utilizado en **El Nexo OS**, sigue estos pasos en tu terminal:
+
+### 1. Descarga el repositorio completo
+```bash
+git clone https://github.com/antonio101105/nexoOS.git
+```
+```bash
+cd Fase_1
+```
+```bash
+make
+```
